@@ -1,0 +1,117 @@
+version: '3.5'
+
+services:
+
+    logstash:
+        build:
+            context: docker/logstash
+        networks:
+            app_net:
+                ipv4_address: 192.168.244.243
+
+    elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:6.2.1
+        networks:
+            app_net:
+                ipv4_address: 192.168.244.244
+        environment:
+            discovery.type: single-node
+        volumes:
+            - elastic:/usr/share/elasticsearch/data
+
+    kibana:
+        image: docker.elastic.co/kibana/kibana:6.2.1
+        ports:
+            - "127.0.0.1:8181:5601"
+        networks:
+            - app_net
+        environment:
+            ELASTICSEARCH_URL: http://192.168.244.244:9200
+        depends_on:
+            - elasticsearch
+            - logstash
+
+    # serves as load balancer
+    nginx:
+        build:
+            context: docker/nginx
+        ports:
+            - "127.0.0.1:8080:80"
+        networks:
+            - app_net
+        depends_on:
+            - apache1
+            - apache2
+            - logstash
+
+    apache1:
+        build:
+            context: docker/apache
+        depends_on:
+            - php-fpm
+            - logstash
+        networks:
+            - app_net
+        logging:
+            driver: syslog
+            options:
+                syslog-address: "udp://192.168.244.243:5000"
+                tag: apache1
+
+    apache2:
+        build:
+            context: docker/apache
+        networks:
+            - app_net
+        depends_on:
+            - php-fpm
+            - logstash
+        logging:
+            driver: syslog
+            options:
+                syslog-address: "udp://192.168.244.243:5000"
+                tag: apache2
+
+    php-fpm:
+        build:
+            context: docker/php-fpm
+        networks:
+            - app_net
+        depends_on:
+            - redis
+            - logstash
+
+    redis:
+        image: redis:3.2-alpine
+        networks:
+            - app_net
+        volumes:
+            - sessions:/data
+        depends_on:
+            - logstash
+
+    jenkins:
+        build:
+            context: docker/jenkins
+        ports:
+            - "127.0.0.1:8282:8080"
+        networks:
+            - app_net
+        volumes:
+            - jenkins:/var/jenkins_home
+        depends_on:
+            - elasticsearch
+            - logstash
+
+volumes:
+    sessions:
+    elastic:
+    jenkins:
+
+networks:
+  app_net:
+    driver: bridge
+    ipam:
+      config:
+      -
+        subnet: 192.168.244.0/24
