@@ -21,6 +21,3 @@ COPY seed-job/ /usr/share/jenkins/ref/jobs/_seed-job
 COPY init_scripts/*.groovy  /usr/share/jenkins/ref/init.groovy.d/
 
 COPY jobs/ /tmp/jobs/
-
-# COPY can chown on the fly in newer docker but i have older one installed
-#RUN chown -Rv jenkins:jenkins /var/jenkins_home/ /usr/share/jenkins/ref/init.groovy.d/
